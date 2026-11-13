@@ -1,9 +1,7 @@
-name: Remove Canonical Tags
+name: Remove Canonical Tags (Deep Clean)
 
 on:
-  workflow_dispatch: # Jalankan manual kapan saja dari tab Actions
-  push:
-    branches: [ main, master ] # Otomatis berjalan setiap ada update file HTML
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -12,40 +10,49 @@ jobs:
   clean-canonical:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
+      - name: Checkout Repository (All Branches)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Hapus Tag Canonical di Semua File HTML
+      - name: Cari dan Hapus Canonical di Semua File & Cek Branch
         run: |
+          echo "=== Daftar Branch ==="
+          git branch -a
+
           python3 - << 'EOF'
           import os
           import re
 
-          # Pola regex untuk menangkap tag <link ... rel="canonical" ...> dalam berbagai variasi urutan atribut
+          # Tangkap berbagai bentuk tag link canonical atau teks canonical
           canonical_pattern = re.compile(
-              r'<link\b[^>]*\brel\s*=\s*["\']?canonical["\']?[^>]*>\s*',
+              r'<link\b[^>]*canonical[^>]*>\s*',
               re.IGNORECASE
           )
 
           modified_count = 0
 
           for root, dirs, files in os.walk("."):
-              if ".git" in root or ".github" in root:
+              if ".git" in root:
                   continue
               for file in files:
-                  if file.endswith(".html"):
+                  # Jangan edit workflow pembersih ini sendiri
+                  if file == "remove-canonical.yml":
+                      continue
+                  if file.endswith((".html", ".htm", ".py", ".yml", ".yaml", ".js", ".php", ".txt")):
                       file_path = os.path.join(root, file)
                       try:
                           with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                               content = f.read()
 
-                          new_content, count = canonical_pattern.subn("", content)
-
-                          if count > 0:
-                              with open(file_path, "w", encoding="utf-8") as f:
-                                  f.write(new_content)
-                              print(f"Berhasil menghapus {count} tag canonical dari: {file_path}")
-                              modified_count += 1
+                          if "canonical" in content.lower():
+                              print(f"Ditemukan kata 'canonical' di: {file_path}")
+                              new_content, count = canonical_pattern.subn("", content)
+                              if count > 0:
+                                  with open(file_path, "w", encoding="utf-8") as f:
+                                      f.write(new_content)
+                                  print(f"--> Berhasil menghapus {count} baris tag canonical di {file_path}")
+                                  modified_count += 1
                       except Exception as e:
                           print(f"Gagal memproses {file_path}: {e}")
 
@@ -56,6 +63,6 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add "*.html"
-          git commit -m "🧹 Remove canonical tags from HTML files" || echo "Tidak ada tag canonical yang perlu dihapus"
+          git add -A
+          git commit -m "🧹 Deep remove canonical tags" || echo "Tidak ada perubahan yang perlu di-commit"
           git push
