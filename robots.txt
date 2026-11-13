@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Sitemap: https://thenewsday112.github.io/semuaartikel33/sitemap.xml
+Crawl-delay: 1
